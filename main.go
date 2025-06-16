@@ -1,44 +1,54 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/spf13/cobra"
 )
 
 func main() {
-	var unixFlag, utcFlag bool
-	flag.BoolVar(&unixFlag, "unix", false, "output in Unix timestamp format")
-	flag.BoolVar(&utcFlag, "utc", false, "output in UTC format")
-	flag.Parse()
+    var unixFlag, utcFlag bool
 
-	args := flag.Args()
+    var rootCmd = &cobra.Command{
+        Use:   "sudc [flags] <expression>",
+        Short: "Simple Unix date calculator",
+        Args:  cobra.MinimumNArgs(1),
+        Run: func(cmd *cobra.Command, args []string) {
+            expression := strings.Join(args, " ")
 
-	if len(args) == 0 {
-		fmt.Println("Usage: sudc [--unix|--utc] <expression>")
-		fmt.Println("Examples:")
-		fmt.Println("  sudc now --unix")
-		fmt.Println("  sudc --unix \"now-2d\"")
-		fmt.Println("  sudc --utc 1750071305-1749898505")
-		return
-	}
+            if unixFlag && utcFlag {
+                fmt.Println("Error: cannot use both --unix and --utc flags together")
+                os.Exit(1)
+            }
 
-	expression := strings.Join(args, " ")
+            result, err := evaluateExpression(expression, unixFlag, utcFlag)
+            if err != nil {
+                fmt.Printf("Error: %v\n", err)
+                os.Exit(1)
+            }
 
-	if unixFlag && utcFlag {
-		fmt.Println("Error: cannot use both --unix and --utc flags together")
-		os.Exit(1)
-	}
+            fmt.Println(result)
+        },
+    }
 
-	result, err := evaluateExpression(expression, unixFlag, utcFlag)
-	if err != nil {
-		fmt.Printf("Error: %v\n", err)
-		os.Exit(1)
-	}
+    rootCmd.Flags().BoolVar(&unixFlag, "unix", false, "output in Unix timestamp format")
+    rootCmd.Flags().BoolVar(&utcFlag, "utc", false, "output in UTC format")
 
-	fmt.Println(result)
+    rootCmd.SetHelpTemplate(`Usage: sudc [--unix|--utc] <expression>
+Examples:
+  sudc now --unix
+  sudc --unix "now-2d"
+  sudc --utc 1750071305-1749898505
+
+{{.UsageString}}`)
+
+    if err := rootCmd.Execute(); err != nil {
+        fmt.Println(err)
+        os.Exit(1)
+    }
 }
 
 func evaluateExpression(expr string, unixOutput, utcOutput bool) (string, error) {
@@ -98,33 +108,39 @@ func evaluateExpression(expr string, unixOutput, utcOutput bool) (string, error)
 }
 
 func parseDuration(s string) (time.Duration, error) {
-	if s == "" {
-		return 0, nil
-	}
+    if s == "" {
+        return 0, nil
+    }
 
-	unitMap := map[string]time.Duration{
-		"s": time.Second,
-		"m": time.Minute,
-		"h": time.Hour,
-		"d": 24 * time.Hour,
-	}
+    unitMap := map[string]time.Duration{
+        "s": time.Second,
+        "m": time.Minute,
+        "h": time.Hour,
+        "d": 24 * time.Hour,
+    }
 
-	var num int
-	var unit string
+    var sign int64 = 1
+    if s[0] == '-' {
+        sign = -1
+        s = s[1:]
+    } else if s[0] == '+' {
+        s = s[1:]
+    }
 
-	// Parse number
-	n, err := fmt.Sscanf(s, "%d%s", &num, &unit)
-	if err != nil || n != 2 {
-		return 0, fmt.Errorf("invalid duration format")
-	}
+    var num int64
+    var unit string
 
-	// Get unit
-	durationUnit, ok := unitMap[unit]
-	if !ok {
-		return 0, fmt.Errorf("unknown duration unit: %s", unit)
-	}
+    n, err := fmt.Sscanf(s, "%d%s", &num, &unit)
+    if err != nil || n != 2 {
+        return 0, fmt.Errorf("invalid duration format")
+    }
 
-	return time.Duration(num) * durationUnit, nil
+    durationUnit, ok := unitMap[unit]
+    if !ok {
+        return 0, fmt.Errorf("unknown duration unit: %s", unit)
+    }
+
+    return time.Duration(sign * num) * durationUnit, nil
 }
 
 func parseUnixTime(s string) (time.Time, error) {
