@@ -9,8 +9,9 @@ import (
 )
 
 func main() {
-	unixFlag := flag.Bool("unix", false, "output in Unix timestamp format")
-	utcFlag := flag.Bool("utc", false, "output in UTC format")
+	var unixFlag, utcFlag bool
+	flag.BoolVar(&unixFlag, "unix", false, "output in Unix timestamp format")
+	flag.BoolVar(&utcFlag, "utc", false, "output in UTC format")
 	flag.Parse()
 
 	args := flag.Args()
@@ -26,12 +27,12 @@ func main() {
 
 	expression := strings.Join(args, " ")
 
-	if *unixFlag && *utcFlag {
+	if unixFlag && utcFlag {
 		fmt.Println("Error: cannot use both --unix and --utc flags together")
 		os.Exit(1)
 	}
 
-	result, err := evaluateExpression(expression, *unixFlag, *utcFlag)
+	result, err := evaluateExpression(expression, unixFlag, utcFlag)
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
 		os.Exit(1)
@@ -84,6 +85,12 @@ func evaluateExpression(expr string, unixOutput, utcOutput bool) (string, error)
 		if err != nil {
 			return "", err
 		}
+		return formatOutput(t, unixOutput, utcOutput), nil
+	}
+
+	// Default output format if no flags specified
+	t, err := parseUnixTime(expr)
+	if err == nil {
 		return formatOutput(t, unixOutput, utcOutput), nil
 	}
 
