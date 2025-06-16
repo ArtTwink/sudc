@@ -45,10 +45,16 @@ sudc [--unix|--utc] <expression>
 - `--unix` — Output as Unix timestamp
 - `--utc` — Output as UTC RFC3339 string
 
-## Build
+# Building for Multiple Platforms
+You can build the sudc binary for different platforms using Go’s cross-compilation:
 
+## Build for Linux amd64
 ```
-go build -o bin/sudc main.go
+GOOS=linux GOARCH=amd64 go build -o sudc-linux-amd64
+```
+## Build for macOS amd64
+```
+GOOS=darwin GOARCH=amd64 go build -o sudc-darwin-amd64
 ```
 
 ## Requirements
